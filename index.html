@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Búsquedas Sierras</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+        }
+        button:hover { background: #1d4ed8; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        h1 { font-size: 28px; font-weight: 600; }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .metric-value { font-size: 32px; font-weight: 700; margin-top: 5px; }
+        .metric-label { font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            margin-bottom: 20px;
+        }
+        .busqueda {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #ddd;
+        }
+        .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #e0f2fe;
+            color: #0369a1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 5px;
+            text-transform: uppercase;
+        }
+        .badge-urgente { background: #fee; color: #dc2626; }
+        .badge-alta { background: #fef3c7; color: #d97706; }
+        .badge-media { background: #dbeafe; color: #2563eb; }
+        .badge-baja { background: #f3f4f6; color: #6b7280; }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            text-align: center;
+            z-index: 1000;
+        }
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p style="font-size: 16px; font-weight: 500;">Cargando búsquedas...</p>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🏘️ Búsquedas Sierras</h1>
+                <p style="font-size: 14px; color: #666; margin-top: 5px;" id="sync">Sistema sincronizado con Google Sheets</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="cargar()"><i class="ti ti-refresh"></i> ACTUALIZAR</button>
+                <button onclick="window.open('https://docs.google.com/spreadsheets/d/1n0axc20iS5DRxhg9fGY1CrOsmMvlFUHs/edit','_blank')" style="background: #059669;">
+                    <i class="ti ti-external-link"></i> Abrir Sheets
+                </button>
+            </div>
+        </div>
+
+        <div class="metrics">
+            <div class="card">
+                <div class="metric-label">Total</div>
+                <div class="metric-value" id="total">0</div>
+            </div>
+            <div class="card">
+                <div class="metric-label">Compras</div>
+                <div class="metric-value" style="color: #2563eb;" id="compras">0</div>
+            </div>
+            <div class="card">
+                <div class="metric-label">Alquileres</div>
+                <div class="metric-value" style="color: #059669;" id="alquileres">0</div>
+            </div>
+            <div class="card">
+                <div class="metric-label">Urgentes</div>
+                <div class="metric-value" style="color: #dc2626;" id="urgentes">0</div>
+            </div>
+        </div>
+
+        <input type="text" id="filtro" placeholder="🔍 Buscar por agente, zona, comentarios..." oninput="filtrar()">
+
+        <div id="lista"></div>
+        <div id="vacio" class="hidden" style="text-align: center; padding: 80px; color: #999;">
+            <i class="ti ti-folder-open" style="font-size: 80px; opacity: 0.3;"></i>
+            <p style="margin-top: 20px; font-size: 17px;">Click en ACTUALIZAR para cargar las búsquedas</p>
+        </div>
+    </div>
+
+    <script>
+        const PROXY = 'https://corsproxy.io/?';
+        const URL = PROXY + encodeURIComponent('https://docs.google.com/spreadsheets/d/1n0axc20iS5DRxhg9fGY1CrOsmMvlFUHs/export?format=csv&gid=0');
+        
+        let datos = [];
+        let filtrados = [];
+        
+        async function cargar() {
+            document.getElementById('loading').classList.remove('hidden');
+            try {
+                const res = await fetch(URL);
+                const txt = await res.text();
+                const lineas = txt.split('\n');
+                
+                datos = [];
+                for (let i = 1; i < lineas.length; i++) {
+                    const linea = lineas[i].trim();
+                    if (!linea) continue;
+                    
+                    const celdas = parsearCSV(linea);
+                    if (celdas.length < 7) continue;
+                    
+                    const op = celdas[1];
+                    const prod = celdas[3];
+                    if (!op || !prod) continue;
+                    
+                    let presu = null;
+                    if (celdas[4]) {
+                        const num = celdas[4].replace(/[^0-9.-]/g, '');
+                        presu = num ? parseFloat(num) : null;
+                    }
+                    
+                    datos.push({
+                        fecha: parsearFecha(celdas[0]),
+                        operacion: op.toUpperCase(),
+                        credito: (celdas[2] || 'NO').toUpperCase(),
+                        producto: prod.toUpperCase(),
+                        presupuesto: presu,
+                        comentarios: celdas[5] || '',
+                        agente: celdas[6] || '',
+                        urgencia: celdas[7] || 'BAJA'
+                    });
+                }
+                
+                datos.forEach(b => {
+                    const hoy = new Date();
+                    const fecha = new Date(b.fecha);
+                    b.dias = Math.floor((hoy - fecha) / 86400000);
+                    if (!b.urgencia || b.urgencia === 'BAJA') {
+                        if (b.dias <= 7) b.urgencia = 'URGENTE';
+                        else if (b.dias <= 30) b.urgencia = 'ALTA';
+                        else if (b.dias <= 60) b.urgencia = 'MEDIA';
+                        else b.urgencia = 'BAJA';
+                    }
+                });
+                
+                filtrar();
+                document.getElementById('sync').textContent = `✅ ${datos.length} búsquedas - ${new Date().toLocaleTimeString('es-AR')}`;
+                document.getElementById('loading').classList.add('hidden');
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading').classList.add('hidden');
+                alert('Error al cargar. Intentá de nuevo.');
+            }
+        }
+        
+        function parsearCSV(linea) {
+            const res = [];
+            let celda = '';
+            let enComillas = false;
+            for (let i = 0; i < linea.length; i++) {
+                const c = linea[i];
+                if (c === '"') enComillas = !enComillas;
+                else if (c === ',' && !enComillas) {
+                    res.push(celda.trim());
+                    celda = '';
+                } else celda += c;
+            }
+            res.push(celda.trim());
+            return res;
+        }
+        
+        function parsearFecha(v) {
+            if (!v) return new Date().toISOString().split('T')[0];
+            if (v.includes('/')) {
+                const p = v.split('/');
+                const d = p[0].padStart(2, '0');
+                const m = p[1].padStart(2, '0');
+                let a = p[2];
+                if (a.length === 2) a = '20' + a;
+                return `${a}-${m}-${d}`;
+            }
+            return v;
+        }
+        
+        function filtrar() {
+            const txt = document.getElementById('filtro').value.toLowerCase();
+            filtrados = datos.filter(b => {
+                if (txt) {
+                    const buscar = `${b.comentarios} ${b.agente} ${b.producto}`.toLowerCase();
+                    if (!buscar.includes(txt)) return false;
+                }
+                return true;
+            });
+            filtrados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+            
+            document.getElementById('total').textContent = datos.length;
+            document.getElementById('compras').textContent = datos.filter(b => b.operacion.includes('COMPRA')).length;
+            document.getElementById('alquileres').textContent = datos.filter(b => b.operacion.includes('ALQUILER')).length;
+            document.getElementById('urgentes').textContent = datos.filter(b => b.urgencia === 'URGENTE' || b.urgencia === 'ALTA').length;
+            
+            render();
+        }
+        
+        function render() {
+            const lista = document.getElementById('lista');
+            const vacio = document.getElementById('vacio');
+            
+            if (filtrados.length === 0) {
+                lista.innerHTML = '';
+                vacio.classList.remove('hidden');
+                return;
+            }
+            
+            vacio.classList.add('hidden');
+            lista.innerHTML = filtrados.map(b => {
+                const color = b.urgencia === 'URGENTE' ? '#ef4444' : 
+                             b.urgencia === 'ALTA' ? '#f59e0b' : 
+                             b.urgencia === 'MEDIA' ? '#3b82f6' : '#e5e7eb';
+                
+                const ini = b.agente ? 
+                    (b.agente.split(' ').length >= 2 ? 
+                        b.agente.split(' ')[0][0] + b.agente.split(' ')[1][0] : 
+                        b.agente.substring(0, 2)).toUpperCase() : '??';
+                
+                const presu = b.presupuesto ? 
+                    `USD ${Math.round(b.presupuesto).toLocaleString('es-AR')}` : 
+                    'Sin presupuesto';
+                
+                return `
+                    <div class="busqueda" style="border-left-color: ${color};">
+                        <div style="display: flex; gap: 16px; margin-bottom: 15px;">
+                            <div class="avatar">${ini}</div>
+                            <div style="flex: 1;">
+                                <div style="display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; align-items: center;">
+                                    <strong style="font-size: 17px;">${b.operacion}</strong>
+                                    <span class="badge badge-${b.urgencia.toLowerCase()}">${b.urgencia}</span>
+                                </div>
+                                <div style="font-size: 14px; color: #666; margin-bottom: 5px;">
+                                    <strong>${b.agente}</strong> • ${b.producto}
+                                </div>
+                                <div style="font-size: 13px; color: #999;">
+                                    Hace ${b.dias} días • ${new Date(b.fecha).toLocaleDateString('es-AR')}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 19px; font-weight: 700; color: #059669;">${presu}</div>
+                            </div>
+                        </div>
+                        ${b.comentarios ? `
+                        <div style="padding: 14px; background: #f9fafb; border-radius: 8px; margin-top: 14px;">
+                            <div style="font-size: 14px; line-height: 1.6; color: #555;">${b.comentarios}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        window.addEventListener('DOMContentLoaded', cargar);
+    </script>
+</body>
+</html>
